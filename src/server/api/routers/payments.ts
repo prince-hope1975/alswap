@@ -8,7 +8,12 @@ import {
 } from "~/server/api/trpc";
 import { getDollarRate, trasnferUsdcToAlgo } from "~/lib/wallet/utils";
 import { env } from "~/env";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import axios from "axios";
 const paystack = new Paystack(env.PAYSTACK_SECRET_KEY);
+const projectRoot = process.cwd();
+const publicPath = path.join(projectRoot, "public");
 
 export const paymentsRouter = createTRPCRouter({
   makePayment: publicProcedure
@@ -48,6 +53,28 @@ export const paymentsRouter = createTRPCRouter({
       }
     }),
 
+  getBanks: publicProcedure.query(async () => {
+    const data = (await readFile(path.join(publicPath, "banks.json"))).toJSON();
+    return data;
+  }),
+  getAccountInfo: publicProcedure
+    .input(z.object({ code: z.string(), account: z.string().or(z.number()) }))
+    .mutation(async ({ input }) => {
+      const RecResponse = z.object({
+        status: z.boolean(),
+        message: z.string(),
+        data: z.object({
+          account_number: z.string(),
+          account_name: z.string(),
+          bank_id: z.number(),
+        }),
+      });
+      const rec =  await axios.get<typeof RecResponse._type>(
+        `https://api.paystack.co/bank/resolve?account_number=${input.account}&bank_code=${input.code}`
+      )
+      console.log({rec})
+      return rec;
+    }),
   getSecretMessage: protectedProcedure.query(() => {
     return "you can now see this secret message!";
   }),

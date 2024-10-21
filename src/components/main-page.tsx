@@ -1,15 +1,18 @@
 "use client";
 
 import {
-  ElementRef,
-  type EventHandler,
-  FormEvent,
+  type ElementRef,
+  // type EventHandler,
+  type FormEvent,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { Button, buttonVariants } from "~/components/ui/button";
+import {
+  Button,
+  // buttonVariants
+} from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -30,7 +33,7 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
-import { Moon, Sun, Wallet } from "lucide-react";
+import { Landmark, Moon, PiggyBank, Sun, Wallet } from "lucide-react";
 // import {  } from "~/app/_components/wallet-menu";
 import { api } from "~/trpc/react";
 import {
@@ -60,6 +63,8 @@ import {
 import algosdk from "algosdk2";
 import { getAlgorandClients } from "~/lib/wallet/client";
 import { poolUtils, SupportedNetwork } from "@tinymanorg/tinyman-js-sdk";
+import axios from "axios";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 // import Payment from "~/app/_components/buttons/receive-form-payment"
 const Payment = dynamic(
   () => import("~/app/_components/buttons/receive-form-payment"),
@@ -297,16 +302,85 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
 };
 
 const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
-  const [amount, setAmount] = useAtom(receiveamountAtom);
-  const [nairaAmount, setNairaAmount] = useAtom(nairaReceiveamountAtom);
-  const [bankName, setBankName] = useAtom(bankAtom);
+  const [dollarAmount, setDollarAmount] = useAtom(receiveamountAtom);
+  const [amount, setAmount] = useAtom(nairaReceiveamountAtom);
+  const [bank, setBank] = useAtom(bankAtom);
   const [accountNumber, setAccountNumber] = useAtom(accountAtom);
   const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodtAtom);
+  const { data: dollarRate } = useQuery({
+    queryKey: ["dollarRate"],
+    queryFn: async () => {
+      try {
+        const rate = await fetch("/api/getDollarRate");
+        return await rate.text();
+      } catch (error) {
+        console.error({ error });
+        return null;
+      }
+    },
+    staleTime: 1000 * 60 * 3,
+  });
+  const updatedollarAmount = (amt?: string) => {
+    if (dollarRate && (amt ?? amount)) {
+      const val = (+(amt ?? amount) / +dollarRate).toString();
+      setDollarAmount(val);
+    } else {
+      setDollarAmount("");
+    }
+  };
+  const updatebaseAmount = (amt?: string) => {
+    if (dollarRate && (amt ?? dollarAmount)) {
+      setAmount((+Number(amt ?? dollarAmount) * +dollarRate).toString());
+    } else {
+      setAmount("");
+    }
+  };
+  useEffect(() => {
+    updatedollarAmount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dollarRate]);
+  useEffect(() => {
+    updatebaseAmount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dollarRate]);
+  const { data: banks } = useQuery({
+    queryFn: async () => {
+      try {
+        const rate = await axios.get<
+          Array<{
+            name: string;
+            slug: string;
+            code: string;
+            ussd: string;
+          }>
+        >("/banks.json");
+        return rate;
+      } catch (error) {
+        console.error({ error });
+        return null;
+      }
+    },
+    queryKey: ["getBanks"],
+  });
 
+
+  const {
+    mutate,
+    data: accountInfo,
+    error,
+  } = api.payments.getAccountInfo.useMutation({});
+  useEffect(() => {
+    if (bank?.name && bank?.code && accountNumber?.length >= 11) {
+      mutate({
+        account: accountNumber,
+        code: bank?.code,
+      });
+    }
+  }, [bank?.name, accountNumber]);
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
   };
-
+  const ref = useRef<NonNullable<ElementRef<"div">>>();
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
@@ -315,7 +389,10 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
           id="nairaAmount"
           type="number"
           value={amount}
-          onChange={(e) => setNairaAmount(e.target.value)}
+          onChange={(e) => {
+            setAmount(() => e.target.value);
+            updatedollarAmount(e.target.value);
+          }}
           placeholder="Enter ₦ naira amount "
           required
         />
@@ -325,8 +402,11 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
         <Input
           id="receiveAmount"
           type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          value={dollarAmount}
+          onChange={(e) => {
+            setDollarAmount(() => e.target.value);
+            updatebaseAmount(e.target.value);
+          }}
           placeholder="Enter amount in $ usdt"
           required
         />
@@ -349,14 +429,74 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
       </div>
       <div className="space-y-2">
         <Label htmlFor="bankName">Bank Name</Label>
-        <Input
-          id="bankName"
-          type="text"
-          value={bankName}
-          onChange={(e) => setBankName(e.target.value)}
-          placeholder="Enter your bank name"
-          required
-        />
+        <Command className="group relative">
+          <CommandInput
+            showIcon={false}
+            onValueChange={(e) => {
+              const bankData = banks?.data?.find((bank) => {
+                return bank.name === e;
+              });
+              // if (!bankData) return;
+              setBank({
+                name: e,
+                code: bankData?.code,
+              });
+            }}
+            value={bank?.name}
+            onFocus={() => {
+              ref?.current?.classList?.add("group-focus-within:block");
+            }}
+            placeholder="Paste wallet or choose from dropdown"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <CommandList
+            // @ts-expect-error ref error
+            ref={ref}
+            className="absolute top-[100%] z-10 hidden max-h-[20rem] w-full overflow-scroll rounded bg-accent group-focus-within:block"
+          >
+            <CommandEmpty>
+              <div className="flex flex-col items-start px-2">
+                <p>No Connected wallets found.</p>
+              </div>
+            </CommandEmpty>
+            {banks?.data && (
+              <CommandGroup
+                className="overflow-scroll"
+                heading="Connected Wallets"
+              >
+                {banks?.data?.map((str, i) => {
+                  return (
+                    <CommandItem
+                      onSelect={() => {
+                        setBank({
+                          name: str.name,
+                          code: str?.code,
+                        });
+                        ref?.current?.classList?.remove(
+                          "group-focus-within:block",
+                        );
+                      }}
+                      className="cursor-pointer hover:!bg-accent/50"
+                      value={str.name}
+                      key={`${str.name}_${i}`}
+                    >
+                      <Avatar>
+                        <AvatarImage
+                          className="mr-2"
+                          src={`/logos/${str.slug}.png`}
+                        />
+                        <AvatarFallback>
+                          <Landmark className="mr-2 h-6 w-6" />
+                        </AvatarFallback>
+                      </Avatar>{" "}
+                      {str.name}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
       </div>
       <div className="space-y-2">
         <Label htmlFor="accountNumber">Account Number</Label>
@@ -437,14 +577,12 @@ export function MainPage() {
       signer: transactionSigner,
     });
 
-
     atc.addTransaction({ txn, signer: transactionSigner });
     try {
       await atc.execute(algodClient, 4);
     } catch (error) {
       console.error({ error });
     }
- 
   }
   // const {data:poolD,error}=useQuery({
   //   queryKey:["poolinfos"],
@@ -478,7 +616,7 @@ export function MainPage() {
             <ThemeToggle isDark={isDarkMode} onToggle={setIsDarkMode} />
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="send">
+            <Tabs defaultValue="receive">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="send">Send</TabsTrigger>
                 <TabsTrigger value="receive">Receive</TabsTrigger>

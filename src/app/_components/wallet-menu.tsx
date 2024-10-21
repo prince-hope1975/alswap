@@ -7,16 +7,15 @@ import { Button } from "~/components/ui/button";
 export function WalletMenu() {
   const { wallets, activeWallet, activeAccount, activeWalletAddresses } =
     useWallet();
-  console.log({ firstWallet: activeWallet?.activeNetwork });
   const [open, setOpen] = useState(false);
   return (
     <div className="container mx-auto p-4">
       <h2>Wallets</h2>
       <ul className="flex gap-2">
-        {wallets.map((wallet) => (
+        {wallets.map((wallet,id) => (
           <li
             className="rounded bg-primary-foreground p-2 text-primary hover:bg-secondary"
-            key={wallet.id}
+            key={`${wallet.id}-${id}`}
           >
             <button onClick={() => wallet.connect()}>
               {wallet.metadata.name}
