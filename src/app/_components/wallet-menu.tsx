@@ -30,7 +30,7 @@ export function WalletMenu() {
           <p>{activeWallet.metadata.name}</p> */}
           <h2>Active Account:</h2>
           <p>{activeAccount?.address}</p>
-          <Button variant={"outline"} onClick={() => activeWallet.disconnect()}>
+          <Button className="dark:text-white" variant={"outline"} onClick={() => activeWallet.disconnect()}>
             Disconnect
           </Button>
         </div>

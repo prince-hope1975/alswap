@@ -70,10 +70,14 @@ export const paymentsRouter = createTRPCRouter({
         }),
       });
       const rec =  await axios.get<typeof RecResponse._type>(
-        `https://api.paystack.co/bank/resolve?account_number=${input.account}&bank_code=${input.code}`
+        `https://api.paystack.co/bank/resolve?account_number=${input.account}&bank_code=${input.code}`,
+        {
+          headers: {
+            Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
+          },
+        }
       )
-      console.log({rec})
-      return rec;
+      return rec.data;
     }),
   getSecretMessage: protectedProcedure.query(() => {
     return "you can now see this secret message!";

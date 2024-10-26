@@ -65,6 +65,7 @@ import { getAlgorandClients } from "~/lib/wallet/client";
 import { poolUtils, SupportedNetwork } from "@tinymanorg/tinyman-js-sdk";
 import axios from "axios";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import NiceModal from "@ebay/nice-modal-react";
 // import Payment from "~/app/_components/buttons/receive-form-payment"
 const Payment = dynamic(
   () => import("~/app/_components/buttons/receive-form-payment"),
@@ -224,7 +225,7 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
           >
             <CommandEmpty>
               <div className="flex flex-col items-start px-2">
-                <p>No Connected wallets found.</p>
+                <p>Unknown bank</p>
                 {addressIsValid && (
                   <div
                     onClick={() => {
@@ -301,12 +302,15 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
   );
 };
 
-const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
+const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
+  const { activeAccount } = useWallet();
+  const isWalletConnected = !!activeAccount;
   const [dollarAmount, setDollarAmount] = useAtom(receiveamountAtom);
   const [amount, setAmount] = useAtom(nairaReceiveamountAtom);
   const [bank, setBank] = useAtom(bankAtom);
   const [accountNumber, setAccountNumber] = useAtom(accountAtom);
   const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodtAtom);
+
   const { data: dollarRate } = useQuery({
     queryKey: ["dollarRate"],
     queryFn: async () => {
@@ -320,6 +324,9 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
     },
     staleTime: 1000 * 60 * 3,
   });
+  // useEffect(()=>{
+  //   // NiceModal.show()
+  // },[])
   const updatedollarAmount = (amt?: string) => {
     if (dollarRate && (amt ?? amount)) {
       const val = (+(amt ?? amount) / +dollarRate).toString();
@@ -363,20 +370,28 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
     queryKey: ["getBanks"],
   });
 
-
   const {
     mutate,
     data: accountInfo,
+    isPending,
     error,
-  } = api.payments.getAccountInfo.useMutation({});
+  } = api.payments.getAccountInfo.useMutation({ gcTime: 10000 });
+
+  // useEffect(()=>{
+  //   if(accountNumber?.length ==10){
+  //     mut
+  //   }
+  // },[accountNumber])
   useEffect(() => {
-    if (bank?.name && bank?.code && accountNumber?.length >= 11) {
+    if (bank?.name && bank?.code && accountNumber?.length >= 10) {
       mutate({
         account: accountNumber,
         code: bank?.code,
       });
     }
   }, [bank?.name, accountNumber]);
+  console.log({ accountInfo });
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
   };
@@ -452,7 +467,7 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
           <CommandList
             // @ts-expect-error ref error
             ref={ref}
-            className="absolute top-[100%] z-10 hidden max-h-[20rem] w-full overflow-scroll rounded bg-accent group-focus-within:block"
+            className="absolute top-[100%] z-10 hidden max-h-[13rem] w-full overflow-scroll rounded bg-accent group-focus-within:block"
           >
             <CommandEmpty>
               <div className="flex flex-col items-start px-2">
@@ -476,13 +491,13 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
                           "group-focus-within:block",
                         );
                       }}
-                      className="cursor-pointer hover:!bg-accent/50"
+                      className="dark:gover:text-black flex cursor-pointer gap-2 hover:!bg-accent/50 hover:!bg-zinc-900 hover:!text-white dark:hover:bg-gray-200"
                       value={str.name}
                       key={`${str.name}_${i}`}
                     >
                       <Avatar>
                         <AvatarImage
-                          className="mr-2"
+                          className=""
                           src={`/logos/${str.slug}.png`}
                         />
                         <AvatarFallback>
@@ -499,11 +514,23 @@ const ReceiveForm = ({ isWalletConnected }: { isWalletConnected: boolean }) => {
         </Command>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="accountNumber">Account Number</Label>
+        <div className="flex justify-between">
+          <Label className="text-nowrap" htmlFor="accountNumber">
+            Account Number
+          </Label>
+          <span className="max-w-[60%] truncate text-sm md:text-base">
+            {accountInfo && accountNumber.length === 10 && !isPending && (
+              <div className="text-green-500">
+                {accountInfo?.data?.account_name}
+              </div>
+            )}
+          </span>
+        </div>
         <Input
           id="accountNumber"
           type="text"
           value={accountNumber}
+          maxLength={10}
           onChange={(e) => setAccountNumber(e.target.value)}
           placeholder="Enter your account number"
           required

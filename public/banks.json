@@ -114,15 +114,33 @@
     "ussd": ""
   },
   {
+    "name": "Moniepoint",
+    "slug": "moniepoint",
+    "code": "090405",
+    "ussd": "*5573#"
+  },
+  {
     "name": "One Finance",
     "slug": "one-finance",
     "code": "565",
     "ussd": "*1303#"
   },
   {
+    "name": "Opay",
+    "slug": "opay",
+    "code": "100004",
+    "ussd": "*955#"
+  },
+  {
     "name": "Paga",
     "slug": "paga",
     "code": "327",
+    "ussd": ""
+  },
+  {
+    "name": "Palmpay",
+    "slug": "palmpay",
+    "code": "B99",
     "ussd": ""
   },
   {
