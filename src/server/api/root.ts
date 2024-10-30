@@ -2,6 +2,7 @@ import { postRouter } from "~/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { accountRouter } from "./routers/account";
 import { paymentsRouter } from "./routers/payments";
+import { cryptoRouter } from "./routers/cryptoRouter";
 
 /**
  * This is the primary router for your server.
@@ -11,6 +12,7 @@ import { paymentsRouter } from "./routers/payments";
 export const appRouter = createTRPCRouter({
   post: postRouter,
   account: accountRouter,
+  crypto:cryptoRouter,
   payments: paymentsRouter,
 });
 

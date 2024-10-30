@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ComponentRef,
   type ElementRef,
   // type EventHandler,
   type FormEvent,
@@ -61,11 +62,14 @@ import {
   receiveMethodtAtom,
 } from "../lib/jotai-atoms";
 import algosdk from "algosdk2";
-import { getAlgorandClients } from "~/lib/wallet/client";
-import { poolUtils, SupportedNetwork } from "@tinymanorg/tinyman-js-sdk";
 import axios from "axios";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { getAlgorandClients, trasnferUsdc } from "~/lib/wallet/client";
+import config from "~/config";
 import NiceModal from "@ebay/nice-modal-react";
+import ReceiveModal from "./modals/receive-modal";
+import LoadingModal from "./modals/loading-modal";
+import ErrorModal from "./modals/error-modal";
 // import Payment from "~/app/_components/buttons/receive-form-payment"
 const Payment = dynamic(
   () => import("~/app/_components/buttons/receive-form-payment"),
@@ -133,7 +137,7 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
       return alert("Invalid Address");
     }
   };
-  const ref = useRef<NonNullable<ElementRef<"div">>>();
+  const ref = useRef<ComponentRef<"div">>(null);
   const addressIsValid = useMemo(() => {
     if (recipientAddress?.length == 58) return true;
     return false;
@@ -219,7 +223,6 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <CommandList
-            // @ts-expect-error ref error
             ref={ref}
             className="absolute top-[100%] z-10 hidden w-full overflow-visible rounded bg-accent group-focus-within:block"
           >
@@ -303,13 +306,21 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
 };
 
 const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
-  const { activeAccount } = useWallet();
+  const { activeAccount, transactionSigner, activeAddress } = useWallet();
+  const { data: accountBalances } = api.crypto.getAssetBalances.useQuery({
+    addr: activeAddress!,
+  });
+  const { mutateAsync: getAssetBalances } =
+    api.crypto.getAssetBalancesMutation.useMutation({});
+
   const isWalletConnected = !!activeAccount;
   const [dollarAmount, setDollarAmount] = useAtom(receiveamountAtom);
   const [amount, setAmount] = useAtom(nairaReceiveamountAtom);
   const [bank, setBank] = useAtom(bankAtom);
   const [accountNumber, setAccountNumber] = useAtom(accountAtom);
   const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodtAtom);
+
+  // const {activeAccount}=useWallet()
 
   const { data: dollarRate } = useQuery({
     queryKey: ["dollarRate"],
@@ -324,9 +335,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
     },
     staleTime: 1000 * 60 * 3,
   });
-  // useEffect(()=>{
-  //   // NiceModal.show()
-  // },[])
+
   const updatedollarAmount = (amt?: string) => {
     if (dollarRate && (amt ?? amount)) {
       const val = (+(amt ?? amount) / +dollarRate).toString();
@@ -375,13 +384,10 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
     data: accountInfo,
     isPending,
     error,
-  } = api.payments.getAccountInfo.useMutation({ gcTime: 10000 });
+  } = api.payments.getAccountInfo.useMutation({});
+  const getAdminAddr = api.crypto.getAdminAddress.useMutation();
+  const pay = api.payments.pay.useMutation();
 
-  // useEffect(()=>{
-  //   if(accountNumber?.length ==10){
-  //     mut
-  //   }
-  // },[accountNumber])
   useEffect(() => {
     if (bank?.name && bank?.code && accountNumber?.length >= 10) {
       mutate({
@@ -389,13 +395,54 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
         code: bank?.code,
       });
     }
-  }, [bank?.name, accountNumber]);
-  console.log({ accountInfo });
-
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  }, [bank?.name, bank?.code, accountNumber]);
+    
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!activeAddress) return alert("Connect wallet please");
+    const asc = await getAdminAddr.mutateAsync();
+    let balances = accountBalances;
+    if (!balances) {
+      balances = await getAssetBalances({ addr: activeAddress });
+    }
+    const assetHolding = balances?.["asset-holdings"]?.find(
+      (res) =>
+        res?.["asset-holding"]?.["asset-id"]?.toString() ==
+        config.tokens.usdc?.toString(),
+    );
+
+    if (!assetHolding) return alert("You don't have USDC");
+    if (assetHolding?.["asset-holding"]?.amount < +dollarAmount)
+      return alert("You don't have enough USDC");
+
+    if (accountInfo?.data?.account_name && activeAddress) {
+      NiceModal.show(LoadingModal)
+        .then(() => {
+          console.log("Before loading");
+        })
+        .catch(console.error);
+      console.log("After loading");
+      try {
+        const txn = await trasnferUsdc(+dollarAmount, asc, {
+          signer: transactionSigner,
+          address: activeAddress,
+        });
+        console.log({ txn });
+        const txnId = txn?.txIDs?.at(0);
+        if (!txnId) return;
+        const returned = await pay.mutateAsync({
+          amount: +dollarAmount,
+          blockchainTransactionId: txnId,
+        });
+        console.log({ returned });
+      } catch (error) {
+        NiceModal.remove(LoadingModal);
+        await NiceModal.show(ErrorModal);
+        console.error(error);
+      }
+    }
   };
-  const ref = useRef<NonNullable<ElementRef<"div">>>();
+  const ref = useRef<NonNullable<ComponentRef<"div">>>(null);
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
@@ -422,7 +469,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
             setDollarAmount(() => e.target.value);
             updatebaseAmount(e.target.value);
           }}
-          placeholder="Enter amount in $ usdt"
+          placeholder="Enter amount in $ USDT"
           required
         />
       </div>
@@ -461,11 +508,10 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
             onFocus={() => {
               ref?.current?.classList?.add("group-focus-within:block");
             }}
-            placeholder="Paste wallet or choose from dropdown"
+            placeholder="Choose bank from dropdown"
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <CommandList
-            // @ts-expect-error ref error
             ref={ref}
             className="absolute top-[100%] z-10 hidden max-h-[13rem] w-full overflow-scroll rounded bg-accent group-focus-within:block"
           >
@@ -475,10 +521,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
               </div>
             </CommandEmpty>
             {banks?.data && (
-              <CommandGroup
-                className="overflow-scroll"
-                heading="Connected Wallets"
-              >
+              <CommandGroup className="overflow-scroll" heading="Bank List">
                 {banks?.data?.map((str, i) => {
                   return (
                     <CommandItem
@@ -491,7 +534,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
                           "group-focus-within:block",
                         );
                       }}
-                      className="dark:gover:text-black flex cursor-pointer gap-2 hover:!bg-accent/50 hover:!bg-zinc-900 hover:!text-white dark:hover:bg-gray-200"
+                      className="flex cursor-pointer gap-2 hover:!bg-accent/50 hover:!bg-zinc-900 hover:!text-white dark:hover:bg-gray-200 dark:hover:text-black"
                       value={str.name}
                       key={`${str.name}_${i}`}
                     >
@@ -524,6 +567,11 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
                 {accountInfo?.data?.account_name}
               </div>
             )}
+            {error && !isPending && (
+              <div className="text-red-500">
+                {"Confirm the account number and try again"}
+              </div>
+            )}
           </span>
         </div>
         <Input
@@ -537,7 +585,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
         />
       </div>
       <Button type="submit" disabled={!isWalletConnected}>
-        Receive Crypto
+        Receive Fiat
       </Button>
     </form>
   );
@@ -647,6 +695,7 @@ export function MainPage() {
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="send">Send</TabsTrigger>
                 <TabsTrigger value="receive">Receive</TabsTrigger>
+                <TabsTrigger value="issue">Issuance</TabsTrigger>
               </TabsList>
               <TabsContent value="send">
                 <SendForm isWalletConnected={isWalletConnected} />

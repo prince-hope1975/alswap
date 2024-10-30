@@ -21,7 +21,9 @@ const LoadingModal = NiceModal.create(() => {
           >
             <X />
           </Button>
-          <p className="text-lg">Loading...</p>
+          <p className="text-lg">
+            Loading...
+          </p>
           <GridLoader size={20} />
         </div>
       </main>

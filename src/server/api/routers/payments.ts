@@ -11,6 +11,7 @@ import { env } from "~/env";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import axios from "axios";
+import { indexer } from "~/lib/wallet/utils/constants";
 const paystack = new Paystack(env.PAYSTACK_SECRET_KEY);
 const projectRoot = process.cwd();
 const publicPath = path.join(projectRoot, "public");
@@ -52,6 +53,19 @@ export const paymentsRouter = createTRPCRouter({
         } as const;
       }
     }),
+  pay: publicProcedure
+    .input(
+      z.object({ blockchainTransactionId: z.string(), amount: z.number() }),
+    )
+    .mutation(async ({ input }) => {
+      const txn = await indexer
+        .lookupTransactionByID(input.blockchainTransactionId)
+        .do();
+      console.log({ txn });
+      if(!txn) throw Error("Transaction not found")
+        
+      return txn
+    }),
 
   getBanks: publicProcedure.query(async () => {
     const data = (await readFile(path.join(publicPath, "banks.json"))).toJSON();
@@ -69,17 +83,14 @@ export const paymentsRouter = createTRPCRouter({
           bank_id: z.number(),
         }),
       });
-      const rec =  await axios.get<typeof RecResponse._type>(
+      const rec = await axios.get<typeof RecResponse._type>(
         `https://api.paystack.co/bank/resolve?account_number=${input.account}&bank_code=${input.code}`,
         {
           headers: {
             Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
           },
-        }
-      )
+        },
+      );
       return rec.data;
     }),
-  getSecretMessage: protectedProcedure.query(() => {
-    return "you can now see this secret message!";
-  }),
 });

@@ -1,6 +1,12 @@
 "use client";
 //import { PROVIDER_ID } from '@txnlab/use-wallet-react'
-import algosdk from "algosdk2";
+import algosdk, {
+  makeAssetTransferTxnWithSuggestedParamsFromObject,
+  makePaymentTxnWithSuggestedParamsFromObject,
+} from "algosdk2";
+import { client } from "./utils/constants";
+import config from "~/config";
+import { formatAmount } from "../utils";
 
 // const getDynamicDeflyWalletConnect = async () => {
 //   const DeflyWalletConnect = (await import("@blockshake/defly-connect"))
@@ -19,8 +25,6 @@ import algosdk from "algosdk2";
 //     .DaffiWalletConnect;
 //   return DaffiWalletConnect;
 // };
-
-
 
 export const getProviderInit: unknown = () => {
   do {
@@ -120,3 +124,61 @@ export const getAlgorandClients = () => {
     indexerClient,
   };
 };
+
+export async function trasnferNativeToAlgo(
+  amount: number,
+  receiver: string,
+  options: {
+    signer: algosdk.TransactionSigner;
+    wallet: algosdk.Account;
+  },
+) {
+  const atc = new algosdk.AtomicTransactionComposer();
+
+  const signer = algosdk.makeBasicAccountTransactionSigner(options?.wallet);
+
+  const suggestedParams = await client.getTransactionParams().do();
+  const txn = makePaymentTxnWithSuggestedParamsFromObject({
+    from: receiver,
+    amount: +amount,
+    suggestedParams: suggestedParams,
+    to: options?.wallet.addr.toString(),
+  });
+
+  atc.addTransaction({
+    txn: txn,
+    signer: signer,
+  });
+
+  const signed = await atc.execute(client, 4);
+  return signed;
+}
+
+export async function trasnferUsdc(
+  amount: number,
+  receiver: string,
+  options: {
+    signer: algosdk.TransactionSigner;
+    address: string;
+  },
+) {
+  const signer: algosdk.TransactionSigner | undefined = options?.signer;
+  const atc = new algosdk.AtomicTransactionComposer();
+
+  const suggestedParams = await client.getTransactionParams().do();
+  const txn = makeAssetTransferTxnWithSuggestedParamsFromObject({
+    to: receiver,
+    amount: formatAmount(+amount),
+    suggestedParams: suggestedParams,
+    from: options?.address,
+    assetIndex: config.tokens.usdc,
+  });
+  atc.addTransaction({
+    txn: txn,
+    signer: signer,
+  });
+  const signed = await atc.execute(client, 4);
+
+  // const result = await client.statusAfterBlock(+tx["txid"]).do();
+  return signed;
+}
