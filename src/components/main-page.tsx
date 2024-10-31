@@ -78,9 +78,6 @@ const Payment = dynamic(
   },
 );
 
-const WalletMenu = dynamic(() => import("~/app/_components/wallet-menu"), {
-  ssr: true,
-});
 const AVM_CHAINS = [
   {
     name: "algo",
@@ -300,7 +297,9 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
           </SelectContent>
         </Select>
       </div>
-      {typeof window !== "undefined" && <Payment />}
+      {/* Payment page */}
+      <Payment />
+      {/* Payment page */}
     </form>
   );
 };
@@ -310,6 +309,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
   const { data: accountBalances } = api.crypto.getAssetBalances.useQuery({
     addr: activeAddress!,
   });
+  console.log({ accountBalances });
   const { mutateAsync: getAssetBalances } =
     api.crypto.getAssetBalancesMutation.useMutation({});
 
@@ -396,7 +396,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
       });
     }
   }, [bank?.name, bank?.code, accountNumber]);
-    
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!activeAddress) return alert("Connect wallet please");
@@ -618,6 +618,7 @@ export function MainPage() {
 
   const [isWalletConnected] = useState(!!activeAccount);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
   async function handleContract() {
     // const { indexerClient } = getAlgorandClients();
     const APP_ID = 723190722;
@@ -674,7 +675,6 @@ export function MainPage() {
   // })
   return (
     <div className={`min-h-screen ${isDarkMode ? "dark" : ""}`}>
-      <WalletMenu />
       <div className="container mx-auto p-4">
         <Card className="mx-auto w-full max-w-2xl">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -688,11 +688,11 @@ export function MainPage() {
               <CardTitle>Crypto Exchange</CardTitle>
               <CardDescription>Send or receive crypto easily</CardDescription>
             </div>
-            <ThemeToggle isDark={isDarkMode} onToggle={setIsDarkMode} />
+            {/* <ThemeToggle isDark={isDarkMode} onToggle={setIsDarkMode} /> */}
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="receive">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="send">Send</TabsTrigger>
                 <TabsTrigger value="receive">Receive</TabsTrigger>
                 <TabsTrigger value="issue">Issuance</TabsTrigger>
@@ -701,6 +701,9 @@ export function MainPage() {
                 <SendForm isWalletConnected={isWalletConnected} />
               </TabsContent>
               <TabsContent value="receive">
+                <ReceiveForm isWalletConnected={isWalletConnected} />
+              </TabsContent>
+              <TabsContent value="issue">
                 <ReceiveForm isWalletConnected={isWalletConnected} />
               </TabsContent>
             </Tabs>

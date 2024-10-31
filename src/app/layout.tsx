@@ -6,6 +6,7 @@ import { type Metadata } from "next";
 import { TRPCReactProvider } from "~/trpc/react";
 import { WalletProviderWrapper } from "./_components/wallet-manager";
 import ModalProvider from "./providers/modal-provider";
+import Navbar from "./_components/nav";
 
 export const metadata: Metadata = {
   title: "Alswap",
@@ -22,7 +23,10 @@ export default function RootLayout({
       <body>
         <ModalProvider>
           <WalletProviderWrapper>
-            <TRPCReactProvider>{children}</TRPCReactProvider>
+            <TRPCReactProvider>
+              <Navbar />
+              {children}
+            </TRPCReactProvider>
           </WalletProviderWrapper>
         </ModalProvider>
       </body>

@@ -26,8 +26,10 @@ export const cryptoRouter = createTRPCRouter({
   getAssetBalances: publicProcedure
     .input(z.object({ addr: z.string().min(58) }))
     .query(async ({ input }) => {
+      const acct = await indexer.lookupAccountByID(input.addr).do();
+      console.log({ acct });
       const values = await indexer.lookupAccountAssets(input.addr).do();
-      return values as AssetHoldingsResponse;
+      return acct as AssetHoldingsResponse;
     }),
   validateAddress: publicProcedure
     .input(z.object({ addr: z.string() }))

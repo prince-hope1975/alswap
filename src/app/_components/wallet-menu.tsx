@@ -1,65 +1,119 @@
 "use client";
 import { useWallet } from "@txnlab/use-wallet-react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTrigger,
+} from "~/components/ui/dialog";
+
 // YIAZAYLN73TRG5AKSCQR7E6JMMAMJHJJIWJEGUAJLPMRSZZVQR246Q6RPE
 export function WalletMenu() {
   const { wallets, activeWallet, activeAccount, activeWalletAddresses } =
     useWallet();
   const [open, setOpen] = useState(false);
   return (
-    <div className="container mx-auto p-4">
-      <h2>Wallets</h2>
-      <ul className="flex gap-2">
-        {wallets.map((wallet,id) => (
-          <li
-            className="rounded bg-primary-foreground p-2 text-primary hover:bg-secondary"
-            key={`${wallet.id}-${id}`}
-          >
-            <button onClick={() => wallet.connect()}>
-              {wallet.metadata.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-
+    <div className="container mx-auto flex p-4">
       {activeWallet && (
         <div className="flex items-center gap-2">
-          {/* <h2>Active Wallet</h2>
-          <p>{activeWallet.metadata.name}</p> */}
-          <h2>Active Account:</h2>
-          <p>{activeAccount?.address}</p>
-          <Button className="dark:text-white" variant={"outline"} onClick={() => activeWallet.disconnect()}>
-            Disconnect
-          </Button>
+          {activeAccount?.address && (
+            <Popover>
+              <PopoverTrigger
+                title={activeAccount?.address}
+                className="w-[100px] cursor-pointer overflow-hidden truncate rounded bg-gray-300 p-2 text-black dark:bg-slate-900 dark:text-white"
+              >
+                {/* <Button className="w-[100px] truncate rounded text-start p-2"> */}
+                {activeAccount?.address}
+                {/* </Button> */}
+              </PopoverTrigger>
+              <PopoverContent className="grid items-center justify-center gap-2">
+                <Button
+                  className="dark:text-white"
+                  variant={"outline"}
+                  onClick={() => activeWallet.disconnect()}
+                >
+                  Disconnect
+                </Button>
+                {/* <Button>Disconnect</Button> */}
+
+                <Dialog>
+                  <DialogTrigger>
+                    <Button
+                      onClick={() => {
+                        setOpen(!open);
+                      }}
+                    >
+                      Switch accounts <ChevronDown />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <div
+                      className={`my-2 grid gap-2 overflow-hidden transition-all`}
+                    >
+                      {activeWalletAddresses?.map((address) => {
+                        if (address == activeAccount?.address) return <></>;
+                        return (
+                          <div
+                            onClick={() => {
+                              activeWallet?.setActiveAccount(address);
+                            }}
+                            className="w-full cursor-pointer overflow-hidden truncate text-wrap rounded bg-gray-900 p-2 text-white"
+                            key={address}
+                          >
+                            <DialogClose>{address}</DialogClose>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Copy address */}
+                <Button
+                  onClick={async () => {
+                    await window.navigator.clipboard.writeText(
+                      activeAccount?.address,
+                    );
+                  }}
+                >
+                  Copy address <Copy />
+                </Button>
+              </PopoverContent>
+            </Popover>
+          )}
+          {!activeAccount?.address && (
+            <Popover>
+              <PopoverTrigger>
+                <Button className="w-[100px] truncate rounded bg-popover p-2">
+                  {activeAccount?.address}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent>
+                <ul className="flex gap-2">
+                  {wallets.map((wallet, id) => (
+                    <li
+                      className="rounded bg-primary-foreground p-2 text-primary hover:bg-secondary"
+                      key={`${wallet.id}-${id}`}
+                    >
+                      <button onClick={() => wallet.connect()}>
+                        {wallet.metadata.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>{" "}
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       )}
-      <Button
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        Switch accounts <ChevronDown />
-      </Button>
-      <div
-        className={`grid gap-2 sm:grid-cols-2 overflow-hidden transition-all my-2 ${open ? "max-h-full" : "max-h-0"}`}
-      >
-        {activeWalletAddresses?.map((address) => {
-          if (address == activeAccount?.address) return <></>;
-          return (
-            <div
-              onClick={() => {
-                activeWallet?.setActiveAccount(address);
-              }}
-              className="w-full cursor-pointer overflow-hidden truncate text-wrap rounded bg-gray-900 p-2 text-white"
-              key={address}
-            >
-              <p>{address}</p>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
