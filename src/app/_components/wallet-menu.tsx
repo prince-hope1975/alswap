@@ -58,7 +58,7 @@ export function WalletMenu() {
                     <div
                       className={`my-2 grid gap-2 overflow-hidden transition-all`}
                     >
-                      {activeWalletAddresses?.map((address) => {
+                      {activeWalletAddresses?.map((address, idx) => {
                         if (address == activeAccount?.address) return <></>;
                         return (
                           <div
@@ -66,7 +66,7 @@ export function WalletMenu() {
                               activeWallet?.setActiveAccount(address);
                             }}
                             className="w-full cursor-pointer overflow-hidden truncate text-wrap rounded bg-gray-900 p-2 text-white"
-                            key={address}
+                            key={`${address}-${idx}`}
                           >
                             <DialogClose>{address}</DialogClose>
                           </div>
@@ -89,30 +89,35 @@ export function WalletMenu() {
               </PopoverContent>
             </Popover>
           )}
-          {!activeAccount?.address && (
-            <Popover>
-              <PopoverTrigger>
-                <Button className="w-[100px] truncate rounded bg-popover p-2">
-                  {activeAccount?.address}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent>
-                <ul className="flex gap-2">
-                  {wallets.map((wallet, id) => (
-                    <li
-                      className="rounded bg-primary-foreground p-2 text-primary hover:bg-secondary"
-                      key={`${wallet.id}-${id}`}
-                    >
-                      <button onClick={() => wallet.connect()}>
-                        {wallet.metadata.name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>{" "}
-              </PopoverContent>
-            </Popover>
-          )}
         </div>
+      )}
+
+      {!activeAccount?.address && (
+        <Popover>
+          <PopoverTrigger>
+            <span className="w-[100px] truncate rounded bg-popover p-2 text-black dark:text-white  ">
+              Connect{" "}
+            </span>
+          </PopoverTrigger>
+          <PopoverContent>
+            <ul className="flex gap-2">
+              {wallets.map((wallet, id) => (
+                <li
+                  className="rounded bg-primary-foreground p-2 text-primary hover:bg-secondary"
+                  key={`${wallet.id}-${id}`}
+                >
+                  <span
+                    className="flex gap-2 items-center"
+                    onClick={() => wallet.connect()}
+                  >
+                    <img className="w-5 h-5" src={wallet?.metadata?.icon} alt={wallet?.metadata?.name} />
+                    {wallet.metadata.name}
+                  </span>
+                </li>
+              ))}
+            </ul>{" "}
+          </PopoverContent>
+        </Popover>
       )}
     </div>
   );

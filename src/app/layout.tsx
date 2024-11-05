@@ -8,6 +8,9 @@ import { WalletProviderWrapper } from "./_components/wallet-manager";
 import ModalProvider from "./providers/modal-provider";
 import Navbar from "./_components/nav";
 
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import LOGO_DARK from "./_components/svgs/bg-logo";
 export const metadata: Metadata = {
   title: "Alswap",
   description:
@@ -20,8 +23,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
-      <body>
-        <ModalProvider>
+      <body className="relative">
+      <LOGO_DARK className="absolute bottom-0 left-0"/>
+      <LOGO_DARK className="hidden sm:block absolute bottom-0 right-0 scale-x-[-1]" />
+
+        <ModalProvider> 
           <WalletProviderWrapper>
             <TRPCReactProvider>
               <Navbar />
@@ -29,6 +35,7 @@ export default function RootLayout({
             </TRPCReactProvider>
           </WalletProviderWrapper>
         </ModalProvider>
+        <ToastContainer />
       </body>
     </html>
   );

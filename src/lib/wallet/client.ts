@@ -4,9 +4,11 @@ import algosdk, {
   makeAssetTransferTxnWithSuggestedParamsFromObject,
   makePaymentTxnWithSuggestedParamsFromObject,
 } from "algosdk2";
-import { client } from "./utils/constants";
+import { client, indexer } from "./utils/constants";
 import config from "~/config";
 import { formatAmount } from "../utils";
+import { PaymnetClient } from "~/contracts/clients/PaymnetClient";
+import * as algokit from "@algorandfoundation/algokit-utils";
 
 // const getDynamicDeflyWalletConnect = async () => {
 //   const DeflyWalletConnect = (await import("@blockshake/defly-connect"))
@@ -168,7 +170,7 @@ export async function trasnferUsdc(
   const suggestedParams = await client.getTransactionParams().do();
   const txn = makeAssetTransferTxnWithSuggestedParamsFromObject({
     to: receiver,
-    amount: formatAmount(+amount),
+    amount: +formatAmount(+amount)?.toFixed(0),
     suggestedParams: suggestedParams,
     from: options?.address,
     assetIndex: config.tokens.usdc,
@@ -182,3 +184,16 @@ export async function trasnferUsdc(
   // const result = await client.statusAfterBlock(+tx["txid"]).do();
   return signed;
 }
+// const fixture = await algokit.getTransactionParams(undefined, client);
+
+// export const paymentContractClient = new PaymnetClient(
+//   {
+//     resolveBy: "id",
+//     id: 728439463,
+//     params: {
+//       ...fixture,
+//       fee: algokit.algos(1).microAlgos,
+//     },
+//   },
+//   client,
+// );

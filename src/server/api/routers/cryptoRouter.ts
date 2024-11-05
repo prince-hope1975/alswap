@@ -1,7 +1,8 @@
 import algosdk from "algosdk";
 import { z } from "zod";
+import config from "~/config";
 import { getAccountInfo, getDollarRate } from "~/lib/wallet/utils";
-import { indexer } from "~/lib/wallet/utils/constants";
+import { client, indexer } from "~/lib/wallet/utils/constants";
 
 import {
   createTRPCRouter,
@@ -20,16 +21,20 @@ export const cryptoRouter = createTRPCRouter({
   getAssetBalancesMutation: publicProcedure
     .input(z.object({ addr: z.string().min(58) }))
     .mutation(async ({ input }) => {
-      const values = await indexer.lookupAccountAssets(input.addr).do();
-      return values as AssetHoldingsResponse;
+      const values = await client
+        .accountAssetInformation(input.addr, config.tokens.usdc)
+        .do();
+      console.log({ values });
+      return values as Assets;
     }),
   getAssetBalances: publicProcedure
     .input(z.object({ addr: z.string().min(58) }))
     .query(async ({ input }) => {
-      const acct = await indexer.lookupAccountByID(input.addr).do();
-      console.log({ acct });
-      const values = await indexer.lookupAccountAssets(input.addr).do();
-      return acct as AssetHoldingsResponse;
+      const values = await client
+        .accountAssetInformation(input.addr, config.tokens.usdc)
+        .do();
+      console.log({ values });
+      return values as Assets;
     }),
   validateAddress: publicProcedure
     .input(z.object({ addr: z.string() }))
@@ -76,4 +81,11 @@ type AssetHoldingsItem = {
 type AssetHoldingsResponse = {
   "asset-holdings": AssetHoldingsItem[];
   round: number;
+};
+type Assets = {
+  ["asset-holding"]: {
+    amount: number;
+    "asset-id": number;
+    "is-frozen": boolean;
+  };
 };

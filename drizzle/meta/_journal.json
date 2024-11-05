@@ -15,6 +15,13 @@
       "when": 1730303888191,
       "tag": "0001_cloudy_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1730819010881,
+      "tag": "0002_rainy_firedrake",
+      "breakpoints": true
     }
   ]
 }

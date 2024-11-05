@@ -1,5 +1,10 @@
 export const testnetConfig = {
   network: "TESTNET",
+  clients:{
+    indexer:"https://testnet-idx.algonode.cloud",
+    main:"https://testnet-api.4160.nodely.dev"
+  },
+
   tokens:{
     algo:0,
     usdc:10458941
