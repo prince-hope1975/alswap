@@ -63,12 +63,13 @@ export async function trasnferNativeToAlgo(amount: number, receiver: string) {
   const signed = await atc.execute(client, 4);
   return signed;
 }
-export async function trasnferUsdcToAlgo(
+export async function trasnferAssetToAlgo(
   amount: number,
   receiver: string,
   options?: {
     signer: algosdk.TransactionSigner;
     wallet: algosdk.Account;
+    asset?: number;
   },
 ) {
   let signer: algosdk.TransactionSigner | undefined = options?.signer;
@@ -76,8 +77,6 @@ export async function trasnferUsdcToAlgo(
   const atc = new algosdk.AtomicTransactionComposer();
   if (!wallet) {
     wallet = algosdk.mnemonicToSecretKey(process.env.WALLET_SEED!);
-    
-
   }
   if (!signer) {
     signer = algosdk.makeBasicAccountTransactionSigner(wallet);
@@ -89,7 +88,7 @@ export async function trasnferUsdcToAlgo(
     amount: +amount,
     suggestedParams: suggestedParams,
     from: wallet.addr.toString(),
-    assetIndex: 10458941,
+    assetIndex: options?.asset ?? 10458941,
   });
   atc.addTransaction({
     txn: txn,

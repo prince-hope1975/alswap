@@ -6,7 +6,7 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { getDollarRate, trasnferUsdcToAlgo } from "~/lib/wallet/utils";
+import { getDollarRate, trasnferAssetToAlgo } from "~/lib/wallet/utils";
 import { env } from "~/env";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -28,6 +28,7 @@ export const paymentsRouter = createTRPCRouter({
       z.object({
         paymentId: z.string().min(1),
         receiver: z.string().min(1),
+        asset: z.number().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -43,10 +44,44 @@ export const paymentsRouter = createTRPCRouter({
         } as const;
       if (!!transaction.data?.amount && !!transaction.data?.reference) {
         const dollarRate = await getDollarRate();
-        console.log({ dollarRate });
         const finalAmount = +dollarRate / (transaction?.data?.amount / 100);
         // Transfer transaction
-        const response = await trasnferUsdcToAlgo(
+        const response = await trasnferAssetToAlgo(
+          finalAmount * 10 ** 6,
+          input?.receiver,
+        );
+        return {
+          message: transaction?.message,
+          success: true,
+          status: "success",
+          response,
+          reference: transaction?.data?.reference,
+        } as const;
+      }
+    }),
+  makeNairaPayment: publicProcedure
+    .input(
+      z.object({
+        paymentId: z.string().min(1),
+        receiver: z.string().min(1),
+        asset: z.number().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const transaction = await paystack.transaction.verify(input.paymentId);
+      if (
+        transaction?.status == false ||
+        transaction?.message == "Transaction reference not found."
+      )
+        return {
+          message: transaction?.message,
+          success: transaction?.status,
+          status: "failed",
+        } as const;
+      if (!!transaction.data?.amount && !!transaction.data?.reference) {
+        const finalAmount = transaction?.data?.amount / 100;
+        // Transfer transaction
+        const response = await trasnferAssetToAlgo(
           finalAmount * 10 ** 6,
           input?.receiver,
         );
@@ -109,12 +144,14 @@ export const paymentsRouter = createTRPCRouter({
           finalTxn?.transaction?.["asset-transfer-transaction"]?.amount ==
           formatAmount(input.amount)
         ) {
+          // Set the transaction values with an initial state of pending
+          // This is to ensure that if the transaction fails we can retrieve it
           await db.insert(transactionDetails).values({
             amount: input.amount?.toString(),
             txId: input.blockchainTransactionId,
             from: finalTxn?.transaction?.sender,
             to: finalTxn?.transaction?.["asset-transfer-transaction"]?.receiver,
-            status: "completed",
+            status: "pending",
             createdAt: new Date(),
           });
 
@@ -124,6 +161,14 @@ export const paymentsRouter = createTRPCRouter({
             source: "balance",
           });
           paystack.transfer.finalize(transfer.message);
+
+          // After finalizing the transaction update the state
+          await db
+            .update(transactionDetails)
+            .set({
+              status: "completed",
+            })
+            .where(eq(transactionDetails.txId, input.blockchainTransactionId));
           return true;
         } else {
           return false;
@@ -133,7 +178,6 @@ export const paymentsRouter = createTRPCRouter({
         throw Error("Transaction not found");
       }
     }),
-
 
   getBanks: publicProcedure.query(async () => {
     const data = (await readFile(path.join(publicPath, "banks.json"))).toJSON();

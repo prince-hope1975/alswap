@@ -162,6 +162,7 @@ export async function trasnferUsdc(
   options: {
     signer: algosdk.TransactionSigner;
     address: string;
+    assetIndex?: number;
   },
 ) {
   const signer: algosdk.TransactionSigner | undefined = options?.signer;
@@ -173,7 +174,36 @@ export async function trasnferUsdc(
     amount: +formatAmount(+amount)?.toFixed(0),
     suggestedParams: suggestedParams,
     from: options?.address,
-    assetIndex: config.tokens.usdc,
+    assetIndex: options?.assetIndex ?? config.tokens.usdc,
+  });
+  atc.addTransaction({
+    txn: txn,
+    signer: signer,
+  });
+  const signed = await atc.execute(client, 4);
+
+  // const result = await client.statusAfterBlock(+tx["txid"]).do();
+  return signed;
+}
+export async function trasnferNaira(
+  amount: number,
+  receiver: string,
+  options: {
+    signer: algosdk.TransactionSigner;
+    address: string;
+    assetIndex?: number;
+  },
+) {
+  const signer: algosdk.TransactionSigner | undefined = options?.signer;
+  const atc = new algosdk.AtomicTransactionComposer();
+
+  const suggestedParams = await client.getTransactionParams().do();
+  const txn = makeAssetTransferTxnWithSuggestedParamsFromObject({
+    to: receiver,
+    amount: +formatAmount(+amount,2)?.toFixed(0),
+    suggestedParams: suggestedParams,
+    from: options?.address,
+    assetIndex: options?.assetIndex ?? config.tokens.usdc,
   });
   atc.addTransaction({
     txn: txn,

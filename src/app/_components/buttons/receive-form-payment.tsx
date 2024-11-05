@@ -30,16 +30,6 @@ const PaymentButton = () => {
   return (
     <ModalTemplate
       onClick={async () => {
-        // return await makeCryptoTransfer({
-        //   paymentId: "YIAZAYLN73TRG5AKSCQR7E6JMMAMJHJJIWJEGUAJLPMRSZZVQR246Q6RPE",
-        //   receiver: "YIAZAYLN73TRG5AKSCQR7E6JMMAMJHJJIWJEGUAJLPMRSZZVQR246Q6RPE",
-        // });
-        console.log({
-          config: {
-            amount: +amount * 100,
-            email: "user@example.com",
-          },
-        });
         // const paystackInstance = new PaystackPop({
         //   config: {
         //     amount: +amount * 100,
@@ -80,7 +70,6 @@ const PaymentButton = () => {
               paymentId: data?.trxref,
               receiver: recipientAddress,
             });
-            console.log({ val });
             NiceModal.remove(LoadingModal);
             if (val?.status == "failed") {
               return toast.error(`Failed to make payment ${val.message}`, {});
@@ -103,6 +92,62 @@ const PaymentButton = () => {
       disabled={!activeAccount}
     >
       Send Crypto
+    </ModalTemplate>
+  );
+};
+export const AssetPaymentButton = () => {
+  const { activeAccount } = useWallet();
+  const { mutateAsync: makeCryptoTransfer } =
+    api.payments.makePayment.useMutation({});
+
+  const [recipientAddress] = useAtom(receipientAtom);
+  const [amount] = useAtom(amountAtom);
+  const makePayment = usePaystackPayment({
+    publicKey: process?.env?.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY ?? "",
+    amount: +amount * 100,
+    email: "amachreeprince8@gmail.com",
+  });
+
+  return (
+    <ModalTemplate
+      onClick={async () => {
+        makePayment({
+          config: {
+            amount: +amount * 100,
+            email: "amachreeprince8@gmail.com",
+          },
+
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises
+          onSuccess: async function (data: TransactionData) {
+            if (data?.status != "success") return toast.error(data?.message);
+            console.log({ data });
+            NiceModal.show(LoadingModal, {}).catch(() => null);
+            const val = await makeCryptoTransfer({
+              paymentId: data?.trxref,
+              receiver: recipientAddress,
+            });
+            NiceModal.remove(LoadingModal);
+            if (val?.status == "failed") {
+              return toast.error(`Failed to make payment ${val.message}`, {});
+            }
+
+            toast.success(`Payment Successful ${val?.message}`, {});
+            // const notification =
+            new Notification("Payment Successful", {
+              body: `You received payment of ${amount} Naira A to ${recipientAddress} \n
+            Your crypto transaction reference is ${val?.reference} \n
+            Your bank transaction reference is ${data?.trxref}`,
+            });
+          },
+        });
+      }}
+      className={cn(
+        buttonVariants({ variant: "default", size: "lg", className: "" }),
+      )}
+      type="submit"
+      disabled={!activeAccount}
+    >
+      Issue Naira A
     </ModalTemplate>
   );
 };

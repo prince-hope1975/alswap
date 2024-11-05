@@ -137,7 +137,7 @@ export const transactionStatus = pgEnum("transaction_status", [
 ]);
 export const transactionDetails = createTable("transaction_details", {
   id: serial("id").primaryKey(),
-  txId: varchar("txId", { length: 256 }).notNull(),
+  txId: varchar("txId", { length: 256 }).notNull().unique(),
   from: varchar("from", { length: 256 }).notNull(),
   to: varchar("to", { length: 256 }).notNull(),
   amount: varchar("amount", { length: 256 }).notNull(),

@@ -1,0 +1,1 @@
+ALTER TABLE "alswap_transaction_details" ADD CONSTRAINT "alswap_transaction_details_txId_unique" UNIQUE("txId");

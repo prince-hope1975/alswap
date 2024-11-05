@@ -53,7 +53,11 @@ import {
 import algosdk from "algosdk2";
 import axios from "axios";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { getAlgorandClients, trasnferUsdc } from "~/lib/wallet/client";
+import {
+  getAlgorandClients,
+  trasnferNaira,
+  trasnferUsdc,
+} from "~/lib/wallet/client";
 import config from "~/config";
 import NiceModal from "@ebay/nice-modal-react";
 import LoadingModal from "./modals/loading-modal";
@@ -61,8 +65,9 @@ import ErrorModal from "./modals/error-modal";
 import { poolUtils, SupportedNetwork } from "@tinymanorg/tinyman-js-sdk";
 // import Payment from "~/app/_components/buttons/receive-form-payment"
 import { Label } from "./ui/label";
-import { formatAmount, formatCurrency } from "~/lib/utils";
+import { formatAmount, formatCurrency, wait } from "~/lib/utils";
 import { toast } from "react-toastify";
+import { AssetPaymentButton } from "~/app/_components/buttons/receive-form-payment";
 
 const Payment = dynamic(
   () => import("~/app/_components/buttons/receive-form-payment"),
@@ -121,7 +126,6 @@ const SendForm = ({}: { isWalletConnected: boolean }) => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
-    console.log("Sending", amount, "to", recipientAddress, "on chain", chain);
     const addrInfo = await mutateAsync({ addr: recipientAddress });
     if (!addrInfo) {
       return alert("Invalid Address");
@@ -446,27 +450,27 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
           accountNumber: accountNumber,
           code: bank?.code,
         });
-        if (returned) {
-          NiceModal.remove(LoadingModal);
-          toast.info(
-            <div className="flex flex-col gap-4">
-              Transaction Successful, your Your funds are the way
-              <span>
-                ${dollarAmount} {"-->"} ₦{amount}
-              </span>
-              <span>Account: {ACCOUNT?.data?.account_name}</span>
-              <span>Account: {ACCOUNT?.data?.account_name}</span>
-              {/* <span>Blockchain Transaction Id: {txnId}</span> */}
-            </div>,
-            {
-              role: "alert",
-              type: "success",
-            },
-          );
+        await wait(5000);
 
-          console.log({ returned });
-        } else {
-        }
+        // if (returned) {
+        NiceModal.remove(LoadingModal);
+        toast.info(
+          <div className="flex flex-col gap-4">
+            Transaction Successful, your Your funds are the way
+            <span>
+              ${dollarAmount} {"-->"} ₦{amount}
+            </span>
+            <span>Account: {ACCOUNT?.data?.account_name}</span>
+            <span>Account: {ACCOUNT?.data?.account_name}</span>
+            {/* <span>Blockchain Transaction Id: {txnId}</span> */}
+          </div>,
+          {
+            role: "alert",
+            type: "success",
+          },
+        );
+        // } else {
+        // }
       } catch (error) {
         NiceModal.remove(LoadingModal);
         NiceModal.show(ErrorModal)
@@ -509,6 +513,7 @@ const ReceiveForm = ({}: { isWalletConnected: boolean }) => {
           type="number"
           value={dollarAmount}
           min={0.5}
+          step={0.5}
           onChange={(e) => {
             setDollarAmount(() => e.target.value);
             updatebaseAmount(e.target.value);
@@ -730,15 +735,10 @@ const Issue = ({}: { isWalletConnected: boolean }) => {
     if (!balances) {
       balances = await getAssetBalances({ addr: activeAddress });
     }
-    console.log({ balances });
-    const assetHolding = balances?.["asset-holdings"]?.find(
-      (res) =>
-        res?.["asset-holding"]?.["asset-id"]?.toString() ==
-        config.tokens.usdc?.toString(),
-    );
+    const assetHolding = balances;
 
     if (!assetHolding) return alert("You don't have USDC");
-    if (assetHolding?.["asset-holding"]?.amount < +dollarAmount)
+    if (assetHolding?.["asset-holding"]?.amount < formatCurrency(+dollarAmount))
       return alert("You don't have enough USDC");
 
     if (accountInfo?.data?.account_name && activeAddress) {
@@ -769,9 +769,14 @@ const Issue = ({}: { isWalletConnected: boolean }) => {
   };
   const ref = useRef<NonNullable<ComponentRef<"div">>>(null);
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+      }}
+      className="space-y-4"
+    >
       <div className="space-y-2">
-        <Label htmlFor="nairaAmount"> ₦ Naira to receive</Label>
+        <Label htmlFor="nairaAmount"> ₦ Naira to Issue</Label>
         <Input
           id="nairaAmount"
           type="number"
@@ -850,9 +855,7 @@ const Issue = ({}: { isWalletConnected: boolean }) => {
           </CommandList>
         </Command>
       </div>
-      <Button type="submit" disabled={!isWalletConnected}>
-        Issue Naira
-      </Button>
+      <AssetPaymentButton></AssetPaymentButton>
     </form>
   );
 };
@@ -860,57 +863,41 @@ const Redeem = ({}: { isWalletConnected: boolean }) => {
   const { activeAccount, transactionSigner, activeAddress } = useWallet();
   const { data: accountBalances } = api.crypto.getAssetBalances.useQuery({
     addr: activeAddress!,
+    asset: config?.tokens?.naira,
   });
-  console.log({ accountBalances });
   const { mutateAsync: getAssetBalances } =
     api.crypto.getAssetBalancesMutation.useMutation({});
 
   const isWalletConnected = !!activeAccount;
-  const [dollarAmount, setDollarAmount] = useAtom(receiveamountAtom);
   const [amount, setAmount] = useAtom(nairaReceiveamountAtom);
   const [bank, setBank] = useAtom(bankAtom);
   const [accountNumber, setAccountNumber] = useAtom(accountAtom);
-  const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodtAtom);
 
   // const {activeAccount}=useWallet()
 
-  const { data: dollarRate } = useQuery({
-    queryKey: ["dollarRate"],
-    queryFn: async () => {
-      try {
-        const rate = await fetch("/api/getDollarRate");
-        return await rate.text();
-      } catch (error) {
-        console.error({ error });
-        return null;
-      }
-    },
-    staleTime: 1000 * 60 * 3,
-  });
-
-  const updatedollarAmount = (amt?: string) => {
-    if (dollarRate && (amt ?? amount)) {
-      const val = (+(amt ?? amount) / +dollarRate).toString();
-      setDollarAmount(val);
-    } else {
-      setDollarAmount("");
-    }
-  };
-  const updatebaseAmount = (amt?: string) => {
-    if (dollarRate && (amt ?? dollarAmount)) {
-      setAmount((+Number(amt ?? dollarAmount) * +dollarRate).toString());
-    } else {
-      setAmount("");
-    }
-  };
-  useEffect(() => {
-    updatedollarAmount();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dollarRate]);
-  useEffect(() => {
-    updatebaseAmount();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dollarRate]);
+  // const updatedollarAmount = (amt?: string) => {
+  //   if (dollarRate && (amt ?? amount)) {
+  //     const val = (+(amt ?? amount) / +dollarRate).toString();
+  //     setDollarAmount(val);
+  //   } else {
+  //     setDollarAmount("");
+  //   }
+  // };
+  // const updatebaseAmount = (amt?: string) => {
+  //   if (dollarRate && (amt ?? dollarAmount)) {
+  //     setAmount((+Number(amt ?? dollarAmount) * +dollarRate).toString());
+  //   } else {
+  //     setAmount("");
+  //   }
+  // };
+  // useEffect(() => {
+  //   updatedollarAmount();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [dollarRate]);
+  // useEffect(() => {
+  //   updatebaseAmount();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [dollarRate]);
   const { data: banks } = useQuery({
     queryFn: async () => {
       try {
@@ -933,6 +920,7 @@ const Redeem = ({}: { isWalletConnected: boolean }) => {
 
   const {
     mutate,
+    mutateAsync: getAccountInfo,
     data: accountInfo,
     isPending,
     error,
@@ -951,46 +939,89 @@ const Redeem = ({}: { isWalletConnected: boolean }) => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    toast.loading("Please wait...", { autoClose: 3000 });
+
     if (!activeAddress) return alert("Connect wallet please");
-    const asc = await getAdminAddr.mutateAsync();
+    if (!(accountNumber?.length >= 10) || !(bank?.name && bank?.code)) {
+      return alert("Invalid account details");
+    }
+    const adminAddress = await getAdminAddr.mutateAsync();
     let balances = accountBalances;
     if (!balances) {
-      balances = await getAssetBalances({ addr: activeAddress });
+      balances = await getAssetBalances({
+        addr: activeAddress,
+        asset: config?.tokens?.naira,
+      });
     }
-    const assetHolding = balances?.["asset-holdings"]?.find(
-      (res) =>
-        res?.["asset-holding"]?.["asset-id"]?.toString() ==
-        config.tokens.usdc?.toString(),
-    );
+    if (!balances) {
+      return toast.warn(
+        `Please try a new wallet You have no Naira A in your wallet: ${activeAddress}`,
+      );
+    }
+    const assetHolding = balances["asset-holding"].amount;
+    console.log({ assetHolding, amount });
+    if (!assetHolding)
+      return toast.warn(
+        `Please try a new wallet You have no Naira A in your wallet: ${activeAddress}`,
+      );
+    if (assetHolding < formatCurrency(+amount))
+      return alert("You don't have enough Funds");
+    let ACCOUNT = accountInfo;
 
-    if (!assetHolding) return alert("You don't have USDC");
-    if (assetHolding?.["asset-holding"]?.amount < +dollarAmount)
-      return alert("You don't have enough USDC");
+    if (!accountInfo) {
+      ACCOUNT = await getAccountInfo({
+        account: accountNumber,
+        code: bank?.code,
+      });
+    }
 
-    if (accountInfo?.data?.account_name && activeAddress) {
+    if (ACCOUNT?.data?.account_name && activeAddress) {
       NiceModal.show(LoadingModal)
         .then(() => {
           console.log("Before loading");
         })
         .catch(console.error);
-      console.log("After loading");
       try {
-        const txn = await trasnferUsdc(+dollarAmount, asc, {
+        const txn = await trasnferNaira(+amount, adminAddress, {
           signer: transactionSigner,
           address: activeAddress,
+          assetIndex: config.tokens?.naira,
         });
-        console.log({ txn });
         const txnId = txn?.txIDs?.at(0);
-        if (!txnId) return;
+        if (!txnId) return alert("Transaction failed");
         const returned = await pay.mutateAsync({
           amount: +dollarAmount,
           blockchainTransactionId: txnId,
+          accountName: ACCOUNT.data.account_name,
+          accountNumber: accountNumber,
+          code: bank?.code,
         });
-        console.log({ returned });
+        if (returned) {
+        NiceModal.remove(LoadingModal);
+        toast.info(
+          <div className="flex flex-col gap-4">
+            Successfully redeemed you funds. Your funds are the way
+            <span>
+              Naira A {amount} {"-->"} ₦{amount}
+            </span>
+            <span>Account: {ACCOUNT?.data?.account_name}</span>
+            <span>Account: {ACCOUNT?.data?.account_name}</span>
+            {/* <span>Blockchain Transaction Id: {txnId}</span> */}
+          </div>,
+          {
+            role: "alert",
+            type: "success",
+          },
+        );
+        }
       } catch (error) {
         NiceModal.remove(LoadingModal);
-        await NiceModal.show(ErrorModal);
-        console.error(error);
+        NiceModal.show(ErrorModal)
+          .then(() => {
+            console.log({ first: "Before loading" });
+          })
+          .catch((err) => console.error(err));
+        console.error({ error });
       }
     }
   };
@@ -1005,7 +1036,6 @@ const Redeem = ({}: { isWalletConnected: boolean }) => {
           value={amount}
           onChange={(e) => {
             setAmount(() => e.target.value);
-            updatedollarAmount(e.target.value);
           }}
           placeholder="Enter ₦ naira amount "
           required
@@ -1108,7 +1138,7 @@ const Redeem = ({}: { isWalletConnected: boolean }) => {
         />
       </div>
       <Button type="submit" disabled={!isWalletConnected}>
-        Redeem Fiat
+        Redeem Naira
       </Button>
     </form>
   );
@@ -1140,7 +1170,7 @@ export function MainPage() {
   //                                 provider?.setActiveAccount(account.address);
 
   const [isWalletConnected] = useState(!!activeAccount);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode] = useState(false);
 
   async function handleContract() {
     // const { indexerClient } = getAlgorandClients();
@@ -1183,20 +1213,7 @@ export function MainPage() {
       console.error({ error });
     }
   }
-  const { data: poolD, error } = useQuery({
-    queryKey: ["poolinfos"],
-    queryFn: async () => {
-      const pool = await poolUtils.v2.getPoolInfo({
-        network: "testnet" as SupportedNetwork,
-        client: algodClient,
-        asset1ID: Number(0),
-        asset2ID: Number(10458941),
-      });
-      console.log({ pool });
-      return pool;
-    },
-  });
-  console.log({ poolD, error });
+
   const [value, setValue] = useState<"receive" | "send" | "issuance">(
     "receive",
   );

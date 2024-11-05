@@ -15,3 +15,7 @@ export const formatAmount = (amount: number, pow = 6) => {
 export function formatCurrency(amt: number, decimals = 6) {
 	return amt / Math.pow(10, decimals);
 }
+
+export async function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

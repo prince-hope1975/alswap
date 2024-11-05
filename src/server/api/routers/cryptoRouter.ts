@@ -19,19 +19,19 @@ export const cryptoRouter = createTRPCRouter({
       return wallet.addr;
     }),
   getAssetBalancesMutation: publicProcedure
-    .input(z.object({ addr: z.string().min(58) }))
+    .input(z.object({ addr: z.string().min(58) , asset: z.number().optional()}))
     .mutation(async ({ input }) => {
       const values = await client
-        .accountAssetInformation(input.addr, config.tokens.usdc)
+        .accountAssetInformation(input.addr,input?.asset?? config.tokens.usdc)
         .do();
       console.log({ values });
       return values as Assets;
     }),
   getAssetBalances: publicProcedure
-    .input(z.object({ addr: z.string().min(58) }))
+    .input(z.object({ addr: z.string().min(58), asset: z.number().optional() }))
     .query(async ({ input }) => {
       const values = await client
-        .accountAssetInformation(input.addr, config.tokens.usdc)
+        .accountAssetInformation(input.addr, input?.asset ?? config.tokens.usdc)
         .do();
       console.log({ values });
       return values as Assets;
